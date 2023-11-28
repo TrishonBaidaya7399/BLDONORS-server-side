@@ -84,7 +84,7 @@ async function run() {
       const email = req.decoded.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
-      const isAdmin = user?.role === "admin";
+      const isAdmin = user?.role === "Admin";
       if (!isAdmin) {
         return res.status(403).send({ message: "forbidden access" });
       }
@@ -106,12 +106,12 @@ async function run() {
       res.send({ admin });
     });
 
-    app.get("/users", async (req, res) => {
+    app.get("/users",verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
 
-    // make an admin
+    // make a volunteer
     app.patch(
       "/users/admin/:id",
       verifyToken,
@@ -122,13 +122,60 @@ async function run() {
         const filter = { _id: new ObjectId(id) };
         const updatedDoc = {
           $set: {
-            role: "admin",
+            role: "Volunteer",
           },
         };
         const result = await userCollection.updateOne(filter, updatedDoc);
         res.send(result);
       }
     );
+    // update user info
+    app.put("/users/:id", async (req, res) => {
+      const data = req.body;
+      console.log("Requested user data for update: ",data);
+        const id = req.params.id;
+        console.log("Requested user id for update: ",id);
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            name: data.name,
+            email: data.email,
+            bloodGroup: data.bloodGroup,
+            district: data.district,
+            upazila: data.upazila,
+            status: data.status,
+          },
+        };
+        const result = await userCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
+
+    app.patch("/users/:id",verifyToken, async (req, res) => {
+      const data = req.body;
+      const id = req.params.id;
+
+      try {
+        const filter = { _id: new ObjectId(id) };
+        const update = {
+          $set: {
+            role: data.role,
+            status: data.status,
+          },
+        };
+
+        const result = await userCollection.updateOne(
+          filter,
+          update
+        );
+        return res.send(result);
+      } catch (error) {
+        console.error("Error confirming user update:", error);
+        return res
+          .status(500)
+          .json({ success: false, message: "Internal server error" });
+      }
+    });
 
     app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
