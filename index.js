@@ -28,6 +28,7 @@ async function run() {
   try {
     const userCollection = client.db("BlDonors").collection("users");
     const RequestToDonateCollection = client.db("BlDonors").collection("requestDonate");
+    const blogCollection = client.db("BlDonors").collection("blogs");
     const donationRequestCollection = client
       .db("BlDonors")
       .collection("donationRequests");
@@ -322,6 +323,19 @@ async function run() {
       res.send(result);
     });
 
+    //<--------------------blogs---------------------->
+    app.post("/blogs", async (req, res) => {
+      const blog = req.body;
+      console.log(blog);
+      const result = await blogCollection.insertOne(blog);
+      res.send(result);
+    });
+
+    //get donation requests with optional status filter
+    app.get("/blogs", async (req, res) => {
+      const result = await blogCollection.find().toArray();
+      res.send(result);
+    });
     
 
     // donation request cart
