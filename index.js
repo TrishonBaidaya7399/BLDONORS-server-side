@@ -27,7 +27,9 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const userCollection = client.db("BlDonors").collection("users");
-    const RequestToDonateCollection = client.db("BlDonors").collection("requestDonate");
+    const RequestToDonateCollection = client
+      .db("BlDonors")
+      .collection("requestDonate");
     const blogCollection = client.db("BlDonors").collection("blogs");
     const donationRequestCollection = client
       .db("BlDonors")
@@ -107,7 +109,7 @@ async function run() {
       res.send({ admin });
     });
 
-    app.get("/users",verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
@@ -133,26 +135,25 @@ async function run() {
     // update user info
     app.put("/users/:id", async (req, res) => {
       const data = req.body;
-      console.log("Requested user data for update: ",data);
-        const id = req.params.id;
-        console.log("Requested user id for update: ",id);
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = {
-          $set: {
-            name: data.name,
-            email: data.email,
-            bloodGroup: data.bloodGroup,
-            district: data.district,
-            upazila: data.upazila,
-            status: data.status,
-          },
-        };
-        const result = await userCollection.updateOne(filter, updatedDoc);
-        res.send(result);
-      }
-    );
+      console.log("Requested user data for update: ", data);
+      const id = req.params.id;
+      console.log("Requested user id for update: ", id);
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          name: data.name,
+          email: data.email,
+          bloodGroup: data.bloodGroup,
+          district: data.district,
+          upazila: data.upazila,
+          status: data.status,
+        },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
 
-    app.patch("/users/:id",verifyToken, async (req, res) => {
+    app.patch("/users/:id", verifyToken, async (req, res) => {
       const data = req.body;
       const id = req.params.id;
 
@@ -165,10 +166,7 @@ async function run() {
           },
         };
 
-        const result = await userCollection.updateOne(
-          filter,
-          update
-        );
+        const result = await userCollection.updateOne(filter, update);
         return res.send(result);
       } catch (error) {
         console.error("Error confirming user update:", error);
@@ -229,7 +227,7 @@ async function run() {
     });
 
     // Confirm donation and update status
-    app.patch("/donationRequest/:id",verifyToken, async (req, res) => {
+    app.patch("/donationRequest/:id", verifyToken, async (req, res) => {
       const data = req.body;
       const id = req.params.id;
 
@@ -261,7 +259,7 @@ async function run() {
       const data = req.body;
       console.log(data);
       const id = req.params.id;
-    
+
       try {
         const filter = { _id: new ObjectId(id) };
         const update = {
@@ -295,28 +293,54 @@ async function run() {
     });
     app.delete("/donationRequest/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id : new ObjectId(id)};
-      const result = await donationRequestCollection.deleteOne(query)
-      res.send(result)
-    }
-    )
+      const query = { _id: new ObjectId(id) };
+      const result = await donationRequestCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // <--------------search--------------->
+    // Get donation request by _id and additional query parameters
+    // app.get("/donationRequest", async (req, res) => {
+    //   const { bloodGroup, district, upazila, email } = req.query;
+    
+    //   // Build the query object based on provided parameters
+    //   const query = {};
+    
+    //   if (bloodGroup) query.bloodGroup = bloodGroup;
+    //   if (district) query.district = district;
+    //   if (upazila) query.upazila = upazila;
+    //   if (email) query.email = email;
+    
+    //   try {
+    //     // Use find() to retrieve multiple documents that match the criteria
+    //     const results = await donationRequestCollection.find(query).toArray();
+    
+    //     res.send(results);
+    //   } catch (error) {
+    //     console.error("Error fetching donation requests:", error);
+    //     res.status(500).json({ success: false, message: "Internal server error" });
+    //   }
+    // });
+    
+
+    
 
     // Request to donate (Donor side)
-    app.post("/requestDonate",verifyToken, async (req, res) => {
+    app.post("/requestDonate", verifyToken, async (req, res) => {
       const donation = req.body;
       console.log(donation);
       const result = await RequestToDonateCollection.insertOne(donation);
       res.send(result);
     });
-    
-    app.get("/requestDonate",verifyToken, async (req, res) => {
+
+    app.get("/requestDonate", verifyToken, async (req, res) => {
       const { status } = req.query;
       const filter = status ? { status } : {}; // Apply status filter if provided
 
       const result = await RequestToDonateCollection.find(filter).toArray();
       res.send(result);
     });
-    app.get("/requestDonate/:id",verifyToken, async (req, res) => {
+    app.get("/requestDonate/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await RequestToDonateCollection.findOne(query);
@@ -336,26 +360,40 @@ async function run() {
       const result = await blogCollection.find().toArray();
       res.send(result);
     });
-    
+
+    app.delete("/blogs/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await blogCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    app.patch("/blogs/:id",verifyToken,verifyAdmin, async (req, res) => {
+      const data = req.body;
+      const id = req.params.id;
+
+      try {
+        const filter = { _id: new ObjectId(id) };
+        const update = {
+          $set: {
+            status: data.status,
+          },
+        };
+
+        const result = await blogCollection.updateOne(
+          filter,
+          update
+        );
+        return res.send(result);
+      } catch (error) {
+        console.error("Error confirming publish:", error);
+        return res
+          .status(500)
+          .json({ success: false, message: "Internal server error" });
+      }
+    });
 
     // donation request cart
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
