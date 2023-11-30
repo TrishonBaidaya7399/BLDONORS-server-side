@@ -1,8 +1,8 @@
 const express = require("express");
+require("dotenv").config();
 const app = express();
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
-require("dotenv").config();
 const port = process.env.PORT || 5000;
 
 //middlewares
@@ -39,7 +39,7 @@ async function run() {
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1hr",
+        expiresIn: "1d",
       });
       console.log("Token: ", token);
       res.send({ token });
@@ -62,24 +62,22 @@ async function run() {
 
     //middleware to verify access token
     const verifyToken = (req, res, next) => {
-      console.log("inside verify token: ", req.headers);
-      if (!req.headers.authorization) {
-        return res.status(401).send({ message: "Forbidden access!" });
+      const authHeader = req?.headers?.authorization;
+      if (!authHeader) {
+        return res.status(401).send('Unauthorized access')
       }
-      const token = req.headers.authorization.split(" ")[1];
-      console.log(token);
-      // console.log(token);
-      if (!token) {
-        return res.status(401).send({ message: "Unauthorized access!" });
-      }
+    
+      const token = authHeader.split(' ')[1];
+    
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
         if (error) {
-          return res.status(401).send({ message: "Unauthorized access!" });
+          return res.status(403).send({
+            message: "forbidden access"
+          })
         }
-        console.log(decoded);
-        req.decoded = decoded;
+        req.decoded = decoded
         next();
-      });
+      })
     };
 
     // use verify admin after verify token
@@ -94,7 +92,7 @@ async function run() {
       next();
     };
 
-    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+    app.get("/users/admin/:email",  async (req, res) => {
       console.log("Message: ", req.params.email, req.decoded.email);
       const email = req.params.email;
       if (email !== req.decoded.email) {
@@ -117,8 +115,6 @@ async function run() {
     // make a volunteer
     app.patch(
       "/users/admin/:id",
-      verifyToken,
-      verifyAdmin,
       async (req, res) => {
         const id = req.params.id;
         // console.log(id);
@@ -133,7 +129,7 @@ async function run() {
       }
     );
     // update user info
-    app.put("/users/:id", async (req, res) => {
+    app.put("/users/:id",  async (req, res) => {
       const data = req.body;
       console.log("Requested user data for update: ", data);
       const id = req.params.id;
@@ -153,7 +149,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/:id", verifyToken, async (req, res) => {
+    app.patch("/users/:id", async (req, res) => {
       const data = req.body;
       const id = req.params.id;
 
@@ -176,7 +172,7 @@ async function run() {
       }
     });
 
-    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
+    app.delete("/users/:id",  async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await userCollection.deleteOne(query);
@@ -202,7 +198,7 @@ async function run() {
 
     // donation requests
     //insert donation request
-    app.post("/donationRequest", async (req, res) => {
+    app.post("/donationRequest", verifyToken, async (req, res) => {
       const donation = req.body;
       console.log(donation);
       const result = await donationRequestCollection.insertOne(donation);
@@ -210,7 +206,7 @@ async function run() {
     });
 
     //get donation requests with optional status filter
-    app.get("/donationRequest", async (req, res) => {
+    app.get("/donationRequest",verifyToken, async (req, res) => {
       const { status } = req.query;
       const filter = status ? { status } : {}; // Apply status filter if provided
 
@@ -219,15 +215,16 @@ async function run() {
     });
 
     //get donation request by _id
-    app.get("/donationRequest/:id", async (req, res) => {
+    app.get("/donationRequest/:id",verifyToken, async (req, res) => {
       const id = req.params.id;
+      console.log(id);
       const query = { _id: new ObjectId(id) };
       const result = await donationRequestCollection.findOne(query);
       res.send(result);
     });
 
     // Confirm donation and update status
-    app.patch("/donationRequest/:id", verifyToken, async (req, res) => {
+    app.patch("/donationRequest/:id",verifyToken,  async (req, res) => {
       const data = req.body;
       const id = req.params.id;
 
@@ -255,7 +252,7 @@ async function run() {
     });
 
     //edit donation request
-    app.put("/donationRequest/:id", async (req, res) => {
+    app.put("/donationRequest/:id",verifyToken, async (req, res) => {
       const data = req.body;
       console.log(data);
       const id = req.params.id;
@@ -291,56 +288,31 @@ async function run() {
           .json({ success: false, message: "Internal server error" });
       }
     });
-    app.delete("/donationRequest/:id", async (req, res) => {
+    app.delete("/donationRequest/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await donationRequestCollection.deleteOne(query);
       res.send(result);
     });
 
-    // <--------------search--------------->
-    // Get donation request by _id and additional query parameters
-    // app.get("/donationRequest", async (req, res) => {
-    //   const { bloodGroup, district, upazila, email } = req.query;
-    
-    //   // Build the query object based on provided parameters
-    //   const query = {};
-    
-    //   if (bloodGroup) query.bloodGroup = bloodGroup;
-    //   if (district) query.district = district;
-    //   if (upazila) query.upazila = upazila;
-    //   if (email) query.email = email;
-    
-    //   try {
-    //     // Use find() to retrieve multiple documents that match the criteria
-    //     const results = await donationRequestCollection.find(query).toArray();
-    
-    //     res.send(results);
-    //   } catch (error) {
-    //     console.error("Error fetching donation requests:", error);
-    //     res.status(500).json({ success: false, message: "Internal server error" });
-    //   }
-    // });
-    
-
-    
+   
 
     // Request to donate (Donor side)
-    app.post("/requestDonate", verifyToken, async (req, res) => {
+    app.post("/requestDonate",  async (req, res) => {
       const donation = req.body;
       console.log(donation);
       const result = await RequestToDonateCollection.insertOne(donation);
       res.send(result);
     });
 
-    app.get("/requestDonate", verifyToken, async (req, res) => {
+    app.get("/requestDonate",  async (req, res) => {
       const { status } = req.query;
       const filter = status ? { status } : {}; // Apply status filter if provided
 
       const result = await RequestToDonateCollection.find(filter).toArray();
       res.send(result);
     });
-    app.get("/requestDonate/:id", verifyToken, async (req, res) => {
+    app.get("/requestDonate/:id",  async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await RequestToDonateCollection.findOne(query);
@@ -348,7 +320,7 @@ async function run() {
     });
 
     //<--------------------blogs---------------------->
-    app.post("/blogs", async (req, res) => {
+    app.post("/blogs", verifyToken, async (req, res) => {
       const blog = req.body;
       console.log(blog);
       const result = await blogCollection.insertOne(blog);
@@ -361,14 +333,14 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/blogs/:id", async (req, res) => {
+    app.delete("/blogs/:id",verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await blogCollection.deleteOne(query);
       res.send(result);
     });
 
-    app.patch("/blogs/:id",verifyToken,verifyAdmin, async (req, res) => {
+    app.patch("/blogs/:id",verifyToken, async (req, res) => {
       const data = req.body;
       const id = req.params.id;
 
@@ -396,9 +368,9 @@ async function run() {
     // donation request cart
 
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
